@@ -23,14 +23,7 @@ SOFTWARE.
  */
 package com.github.filemanager;
 
-import java.awt.BorderLayout;
-import java.awt.Component;
-import java.awt.Container;
-import java.awt.Desktop;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.GridLayout;
-import java.awt.Image;
+import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.*;
 import java.io.*;
@@ -145,6 +138,7 @@ public class FileManager {
             table.setAutoCreateRowSorter(true);
             table.setShowVerticalLines(false);
 
+            // row selection handler
             listSelectionListener =
                     new ListSelectionListener() {
                         @Override
@@ -154,6 +148,48 @@ public class FileManager {
                         }
                     };
             table.getSelectionModel().addListSelectionListener(listSelectionListener);
+
+            // row double click handler.
+            // if double-clicked item is a folder, expand it.
+            // if double-clicked item is a file, "open" it.
+            table.addMouseListener(new MouseAdapter() {
+                public void mousePressed(MouseEvent mouseEvent) {
+                    JTable eventTable =(JTable) mouseEvent.getSource();
+                    Point eventPoint = mouseEvent.getPoint();
+                    int rowIndex = eventTable.rowAtPoint(eventPoint);
+                    if (mouseEvent.getClickCount() == 2 && eventTable.getSelectedRow() != -1 && rowIndex != -1) {
+                        File clickedFile = ((FileTableModel) eventTable.getModel()).getFile(rowIndex);
+                        if (clickedFile.isDirectory()) {
+                            DefaultMutableTreeNode currentTreeNode =
+                                    (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
+                            // find tree node by file selected on the right
+                            DefaultMutableTreeNode treeChild = null;
+                            for (int i = 0; i < currentTreeNode.getChildCount() && treeChild == null; i++) {
+                                DefaultMutableTreeNode child = (DefaultMutableTreeNode) currentTreeNode.getChildAt(i);
+                                File childFile = (File) child.getUserObject();
+                                if (childFile.equals(clickedFile)) {
+                                    treeChild = child;
+                                }
+                            }
+
+                            // expand tree on the left and change selection to new file
+                            if (treeChild != null) {
+                                TreePath pathToChangeTo = new TreePath(treeChild.getPath());
+                                tree.setSelectionPath(pathToChangeTo);
+                            }
+
+                        } else if (clickedFile.isFile()) {
+                            try {
+                                desktop.open(currentFile);
+                            } catch (Throwable t) {
+                                showThrowable(t);
+                            }
+                            gui.repaint();
+                        }
+                    }
+                }
+            });
+
             JScrollPane tableScroll = new JScrollPane(table);
             Dimension d = tableScroll.getPreferredSize();
             tableScroll.setPreferredSize(
